@@ -7,13 +7,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from config import CONFIG
 
-articles = []
+articles_data = []
 def scrape_google_maps(key: str):
     driver = webdriver.Chrome()
-    wait = WebDriverWait(driver, 15)
+    driver.maximize_window()
+    wait = WebDriverWait(driver, 10000)
 
     try:
-        global articles
         driver.get("https://www.google.com/maps")
 
         search_input = wait.until(
@@ -23,35 +23,23 @@ def scrape_google_maps(key: str):
         )
         search_input.send_keys(key)
         search_input.send_keys(Keys.ENTER)
-        time.sleep(3)
-
         scraped = set()
+        scan_leads = True
+        while scan_leads:
+            global articles
+            articles = wait.until(
+                EC.presence_of_all_elements_located((By.XPATH, '//div[@role="article"]/parent::div'))
+            )
 
-        while True:
-            time.sleep(2)
-            articles = driver.find_elements(By.XPATH, '//div[@role="article"]')
-            print(len(articles))
             if len(articles) <= 0:
+                scan_leads = False
                 break
             for article in articles:
-                try:
-                    article.click()
-                except:
-                    break
-
-                time.sleep(2)
-
-                # Extract data
-                try:
-                    name = driver.find_element(By.XPATH, '//h1[contains(@class,"DUwDvf")]').text
-                except:
-                    name = "N/A"
-
-                # Deduplicate
-                if name in scraped:
-                    driver.execute_script("arguments[0].remove()", article)
-                    continue
-
+                article.click()
+                wait.until(
+                    EC.visibility_of_element_located((By.XPATH,'//h1[contains(@class,"DUwDvf")]'))
+                )
+                name = driver.find_element(By.XPATH, '//h1[contains(@class,"DUwDvf")]').text
                 scraped.add(name)
 
                 try:
@@ -95,7 +83,12 @@ def scrape_google_maps(key: str):
                 }
 
                 print(f"Scraped #{len(scraped)}: {name}")
-                time.sleep(5)
+                wait.until(
+                    EC.visibility_of_element_located(
+                        (By.CSS_SELECTOR, "button[aria-label='Close'][data-disable-idom='true']")
+                    )
+                )
+
                 driver.execute_script('document.querySelector("button[aria-label=\'Close\'][data-disable-idom=\'true\']").click();')
                 # Remove processed element
                 driver.execute_script("arguments[0].remove()", article)

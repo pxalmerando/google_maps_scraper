@@ -1,0 +1,12 @@
+# Virtual environment
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# Output data
+google_maps_results.jsonl
+
+# Environment variables
+.env
