@@ -9,8 +9,8 @@ from selenium.webdriver.support import expected_conditions as EC
 
 def scrape_google_maps(key: str):
     driver = webdriver.Chrome()
-    driver.maximize_window()
-    wait = WebDriverWait(driver, 10000)
+    # driver.maximize_window()
+    wait = WebDriverWait(driver, 15)
 
     try:
         driver.get("https://www.google.com/maps")
@@ -42,19 +42,17 @@ def scrape_google_maps(key: str):
                 break
 
             article.click()
-
-            name = wait.until(
-                EC.visibility_of_element_located((By.XPATH,'//h1[contains(@class,"DUwDvf")]'))
-            ).text
-
             try:
-                rating = driver.find_element(
-                    By.XPATH,
-                    '//div[contains(@class,"fontBodyMedium")]//span[@aria-hidden="true"]'
-                ).text
+                wait.until(
+                    lambda d: d.find_element(By.XPATH, '//h1[contains(@class,"DUwDvf")]').text.strip() != ""
+                )
+                name = driver.find_element(By.XPATH,'//h1[contains(@class,"DUwDvf")]').text
+            except:
+                name = "N/A"
+            try:
+                rating = wait.until(EC.presence_of_element_located((By.XPATH, '//div[contains(@class,"fontBodyMedium")]//span[@aria-hidden="true"]'))).text
             except:
                 rating = "N/A"
-
             try:
                 address = driver.find_element(
                     By.XPATH,
@@ -62,7 +60,6 @@ def scrape_google_maps(key: str):
                 ).text
             except:
                 address = "N/A"
-
             try:
                 phone = driver.find_element(
                     By.XPATH,
@@ -101,12 +98,36 @@ def scrape_google_maps(key: str):
     finally:
         driver.quit()
 
-
 if __name__ == "__main__":
-    keyword = CONFIG['keyword']
-    with open("google_maps_results.jsonl", "w", encoding="utf-8") as f:
-        for business in scrape_google_maps(keyword):
-            f.write(json.dumps(business, ensure_ascii=False) + "\n")
-            f.flush()
+    
+    # 1. LOAD CONFIG FROM JSON FILE
+    try:
+        with open("config.json", "r", encoding="utf-8") as f:
+            tasks = json.load(f)
+    except FileNotFoundError:
+        print("❌ Error: config.json not found!")
+        tasks = []
 
-    print("Saved to google_maps_results.jsonl")
+    # 2. RUN THE LOOP
+    with open("google_maps_results.jsonl", "a", encoding="utf-8") as f:
+        for task in tasks:
+            keyword = task.get('keyword')
+            if not keyword: continue
+            
+            print(f"\n🚀 STARTING TASK: {keyword}")
+            count = 0
+            
+            for business in scrape_google_maps(keyword):
+                # Add metadata
+                business['keyword_source'] = keyword
+                
+                # Save immediately
+                f.write(json.dumps(business, ensure_ascii=False) + "\n")
+                f.flush()
+                
+                count += 1
+                print(f"   ✅ [{count}] {business['business_name']}")
+
+            print(f"🏁 FINISHED TASK: {keyword} (Found {count} items)")
+
+    print("\n🎉 All tasks completed!")
